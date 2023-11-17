@@ -33,16 +33,25 @@ async def on_guild_join(guild):
     })
     
 
+import re
+
+ANSI_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+
 @bot.command()
 @is_whitelisted()
-async def shell(ctx, *, cmd):
-    if isinstance(ctx.channel, discord.DMChannel) or ctx.channel.name == CHANNEL_NAME: 
-        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        stdout, stderr = process.communicate()
-        if stdout:
-            await ctx.send(f'```{stdout.decode()}```')
-        if stderr:
-            await ctx.send(f'```{stderr.decode()}```')
+async def run(ctx, *, cmd):
+    if isinstance(ctx.channel, discord.DMChannel) or ctx.channel.name == CHANNEL_NAME:
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, universal_newlines=True)
+        while True:
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                clean_output = ANSI_RE.sub('', output)
+                await ctx.send(f'```{clean_output}```')
+        rc = process.poll()
+        return rc
+
 
 @bot.command()
 @is_whitelisted()
